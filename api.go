@@ -25,7 +25,7 @@ func main() {
 	}
 
 	client := resty.New()
-
+	PORT := os.Getenv("PORT")
 	subscriptionKey := os.Getenv("BING_SUBSCRIPTION_KEY")
 	if subscriptionKey == "" {
 		log.Fatal("BING_SUBSCRIPTION_KEY não configurada")
@@ -104,5 +104,5 @@ func main() {
 		}
 		return c.SendString(string(respJSON))
 	})
-	log.Fatal(app.Listen(":5000"))
+	log.Fatal(app.Listen(PORT))
 }
