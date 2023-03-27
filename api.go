@@ -39,6 +39,9 @@ func main() {
 	api := app.Group("/api")
 	// Test handler
 	api.Get("/", func(c *fiber.Ctx) error {
+		return c.SendString("Hello, World!")
+	})
+	api.Get("/search", func(c *fiber.Ctx) error {
 
 		imageURL := c.Query("imageURL")
 		if imageURL == "" {
