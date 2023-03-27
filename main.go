@@ -21,7 +21,7 @@ func main() {
 
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Println("Error loading .env file")
+		log.Println("Arquivo .env não encontrado")
 	}
 
 	client := resty.New()
