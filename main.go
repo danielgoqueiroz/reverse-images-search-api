@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
 type Result struct {
@@ -18,14 +20,8 @@ type Result struct {
 }
 
 func main() {
-
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Println("Arquivo .env não encontrado")
-	}
-
 	client := resty.New()
-	PORT := os.Getenv("PORT")
+
 	subscriptionKey := os.Getenv("BING_SUBSCRIPTION_KEY")
 	if subscriptionKey == "" {
 		log.Fatal("BING_SUBSCRIPTION_KEY não configurada")
@@ -107,5 +103,19 @@ func main() {
 		}
 		return c.SendString(string(respJSON))
 	})
-	log.Fatal(app.Listen(PORT))
+	err := godotenv.Load(".env")
+
+	if err != nil {
+		viper.SetConfigFile("ENV")
+		PORT := fmt.Sprint(viper.Get("PORT"))
+		log.Fatal(app.Listen(PORT))
+		log.Println("Arquivo .env não encontrado")
+	} else {
+		PORT := os.Getenv("PORT")
+		if PORT == "" {
+			PORT = "5000"
+		}
+		log.Fatal(app.Listen("0.0.0.0:" + PORT))
+	}
+
 }
