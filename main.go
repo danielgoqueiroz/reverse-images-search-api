@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
-	"github.com/spf13/viper"
 )
 
 type Result struct {
@@ -30,8 +28,7 @@ func main() {
 
 	if notLocal {
 		log.Println("Arquivo .env não encontrado")
-		viper.SetConfigFile("ENV")
-		port = fmt.Sprint(viper.Get("PORT"))
+		port = os.Getenv("PORT")
 	}
 
 	subscriptionKey := os.Getenv("BING_SUBSCRIPTION_KEY")
