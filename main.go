@@ -25,10 +25,11 @@ func main() {
 	err := godotenv.Load(".env")
 
 	notLocal := err != nil
-
+	key := "1234567890"
 	if notLocal {
 		log.Println("Arquivo .env não encontrado")
 		port = os.Getenv("PORT")
+		key = os.Getenv("KEY")
 	}
 
 	subscriptionKey := os.Getenv("BING_SUBSCRIPTION_KEY")
@@ -48,6 +49,11 @@ func main() {
 		return c.SendString("Hello, World!")
 	})
 	api.Get("/search", func(c *fiber.Ctx) error {
+
+		keyRequest := c.Request().Header.Peek("key")
+		if key != string(keyRequest) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Chave de acesso inválida"})
+		}
 
 		imageURL := c.Query("imageURL")
 		if imageURL == "" {
