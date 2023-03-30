@@ -20,9 +20,22 @@ type Result struct {
 }
 
 func main() {
+	port := "5000"
+	host := "localhost:"
+
 	client := resty.New()
+	err := godotenv.Load(".env")
+
+	notLocal := err != nil
+
+	if notLocal {
+		log.Println("Arquivo .env não encontrado")
+		viper.SetConfigFile("ENV")
+		port = fmt.Sprint(viper.Get("PORT"))
+	}
 
 	subscriptionKey := os.Getenv("BING_SUBSCRIPTION_KEY")
+
 	if subscriptionKey == "" {
 		log.Fatal("BING_SUBSCRIPTION_KEY não configurada")
 	}
@@ -69,6 +82,10 @@ func main() {
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
+		errorMsg := jsonResp["error"]
+		if errorMsg != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": errorMsg})
+		}
 
 		tags := jsonResp["tags"].([]interface{})
 		for _, tag := range tags {
@@ -103,19 +120,10 @@ func main() {
 		}
 		return c.SendString(string(respJSON))
 	})
-	err := godotenv.Load(".env")
 
-	if err != nil {
-		viper.SetConfigFile("ENV")
-		PORT := fmt.Sprint(viper.Get("PORT"))
-		log.Fatal(app.Listen(PORT))
-		log.Println("Arquivo .env não encontrado")
-	} else {
-		PORT := os.Getenv("PORT")
-		if PORT == "" {
-			PORT = "5000"
-		}
-		log.Fatal(app.Listen("0.0.0.0:" + PORT))
+	if notLocal {
+		host = "0.0.0.0:"
 	}
+	log.Fatal(app.Listen(host + port))
 
 }
