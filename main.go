@@ -18,108 +18,26 @@ type Result struct {
 }
 
 func main() {
-	port := "5000"
-	host := "localhost:"
 
-	client := resty.New()
-	err := godotenv.Load(".env")
-
-	notLocal := err != nil
-	key := "1234567890"
-	if notLocal {
-		log.Println("Arquivo .env não encontrado")
-		port = os.Getenv("PORT")
-		key = os.Getenv("KEY")
-	}
-
-	subscriptionKey := os.Getenv("BING_SUBSCRIPTION_KEY")
-
-	if subscriptionKey == "" {
-		log.Fatal("BING_SUBSCRIPTION_KEY não configurada")
-	}
-	headers := map[string]string{
-		"Ocp-Apim-Subscription-Key": subscriptionKey,
-	}
+	port, host, client, notLocal, key := setup()
 
 	app := fiber.New()
 	app.Use(cors.New())
 	api := app.Group("/api")
-	// Test handler
+	// health check
+	api.Get("/health", func(c *fiber.Ctx) error {
+		return c.SendString("OK")
+	})
+	// hello world
 	api.Get("/", func(c *fiber.Ctx) error {
 		return c.SendString("Hello, World!")
 	})
+
+	// Pesquisa de imagem
 	api.Get("/search", func(c *fiber.Ctx) error {
-
-		keyRequest := c.Request().Header.Peek("key")
-		if key != string(keyRequest) {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Chave de acesso inválida"})
-		}
-
-		imageURL := c.Query("imageURL")
-		if imageURL == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "imageURL não informada"})
-		}
-
-		// Monta a URL da API do Bing
-		searchURL := "https://api.bing.microsoft.com/v7.0/images/visualsearch"
-		queryParams := map[string]string{
-			"imgurl":      imageURL,
-			"mkt":         "en-us",
-			"modules":     "similarimages",
-			"api-version": "7.0",
-		}
-
-		// Faz a solicitação de pesquisa de imagem para a API do Bing
-		resp, err := client.R().
-			SetHeaders(headers).
-			SetQueryParams(queryParams).
-			Post(searchURL)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-		}
-
-		// Processa a resposta da API do Bing e monta a lista de resultados
-		var results []Result
-		var jsonResp map[string]interface{}
-		err = json.Unmarshal(resp.Body(), &jsonResp)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-		}
-		errorMsg := jsonResp["error"]
-		if errorMsg != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": errorMsg})
-		}
-
-		tags := jsonResp["tags"].([]interface{})
-		for _, tag := range tags {
-			displayName := tag.(map[string]interface{})["displayName"].(string)
-			if displayName == "" {
-				actions := tag.(map[string]interface{})["actions"].([]interface{})
-				for _, action := range actions {
-					actionType := action.(map[string]interface{})["actionType"].(string)
-					if actionType == "PagesIncluding" {
-						values := action.(map[string]interface{})["data"].(map[string]interface{})["value"].([]interface{})
-						for _, d := range values {
-							name := d.(map[string]interface{})["name"].(string)
-							hostPageURL := d.(map[string]interface{})["hostPageUrl"].(string)
-							contentURL := d.(map[string]interface{})["contentUrl"].(string)
-
-							// Adiciona o resultado à lista
-							results = append(results, Result{
-								Title:     name,
-								PageLink:  hostPageURL,
-								ImageLink: contentURL,
-							})
-						}
-					}
-				}
-			}
-		}
-
-		// Retorna a lista de resultados como JSON
-		respJSON, err := json.Marshal(results)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		respJSON, shouldReturn, returnValue := bingSearch(c, key, client)
+		if shouldReturn {
+			return returnValue
 		}
 		return c.SendString(string(respJSON))
 	})
@@ -129,4 +47,103 @@ func main() {
 	}
 	log.Fatal(app.Listen(host + port))
 
+}
+
+func setup() (string, string, *resty.Client, bool, string) {
+	port := "5000"
+	host := "localhost:"
+	key := ""
+
+	client := resty.New()
+	err := godotenv.Load(".env")
+
+	notLocal := err != nil
+
+	key = os.Getenv("KEY")
+
+	if notLocal {
+		log.Println("Arquivo .env não encontrado")
+		port = os.Getenv("PORT")
+
+	}
+	return port, host, client, notLocal, key
+}
+
+func bingSearch(c *fiber.Ctx, key string, client *resty.Client) ([]byte, bool, error) {
+	subscriptionKey := os.Getenv("BING_SUBSCRIPTION_KEY")
+
+	if subscriptionKey == "" {
+		log.Fatal("BING_SUBSCRIPTION_KEY não configurada")
+	}
+	headers := map[string]string{
+		"Ocp-Apim-Subscription-Key": subscriptionKey,
+	}
+
+	keyRequest := c.Request().Header.Peek("key")
+	if key != string(keyRequest) {
+		return nil, true, c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Chave de acesso inválida"})
+	}
+
+	imageURL := c.Query("imageURL")
+	if imageURL == "" {
+		return nil, true, c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "imageURL não informada"})
+	}
+
+	searchURL := "https://api.bing.microsoft.com/v7.0/images/visualsearch"
+	queryParams := map[string]string{
+		"imgurl":      imageURL,
+		"mkt":         "en-us",
+		"modules":     "similarimages",
+		"api-version": "7.0",
+	}
+
+	resp, err := client.R().
+		SetHeaders(headers).
+		SetQueryParams(queryParams).
+		Post(searchURL)
+	if err != nil {
+		return nil, true, c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var results []Result
+	var jsonResp map[string]interface{}
+	err = json.Unmarshal(resp.Body(), &jsonResp)
+	if err != nil {
+		return nil, true, c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	errorMsg := jsonResp["error"]
+	if errorMsg != nil {
+		return nil, true, c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": errorMsg})
+	}
+
+	tags := jsonResp["tags"].([]interface{})
+	for _, tag := range tags {
+		displayName := tag.(map[string]interface{})["displayName"].(string)
+		if displayName == "" {
+			actions := tag.(map[string]interface{})["actions"].([]interface{})
+			for _, action := range actions {
+				actionType := action.(map[string]interface{})["actionType"].(string)
+				if actionType == "PagesIncluding" {
+					values := action.(map[string]interface{})["data"].(map[string]interface{})["value"].([]interface{})
+					for _, d := range values {
+						name := d.(map[string]interface{})["name"].(string)
+						hostPageURL := d.(map[string]interface{})["hostPageUrl"].(string)
+						contentURL := d.(map[string]interface{})["contentUrl"].(string)
+
+						results = append(results, Result{
+							Title:     name,
+							PageLink:  hostPageURL,
+							ImageLink: contentURL,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	respJSON, err := json.Marshal(results)
+	if err != nil {
+		return nil, true, c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return respJSON, false, nil
 }
