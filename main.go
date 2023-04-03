@@ -59,22 +59,33 @@ func setup() (string, string, *resty.Client, bool, string) {
 
 	notLocal := err != nil
 
-	key = os.Getenv("KEY")
-
 	if notLocal {
 		log.Println("Arquivo .env não encontrado")
 		port = os.Getenv("PORT")
-
+	} else {
+		log.Println("Arquivo .env encontrado")
 	}
-	return port, host, client, notLocal, key
-}
 
-func bingSearch(c *fiber.Ctx, key string, client *resty.Client) ([]byte, bool, error) {
 	subscriptionKey := os.Getenv("BING_SUBSCRIPTION_KEY")
 
 	if subscriptionKey == "" {
 		log.Fatal("BING_SUBSCRIPTION_KEY não configurada")
+	} else {
+		log.Println("BING_SUBSCRIPTION_KEY configurada", subscriptionKey)
 	}
+
+	return port, host, client, notLocal, key
+}
+
+func bingSearch(c *fiber.Ctx, key string, client *resty.Client) ([]byte, bool, error) {
+
+	subscriptionKey := os.Getenv("BING_SUBSCRIPTION_KEY")
+	if subscriptionKey == "" {
+		log.Fatal("BING_SUBSCRIPTION_KEY não configurada")
+	} else {
+		log.Println("BING_SUBSCRIPTION_KEY configurada", subscriptionKey)
+	}
+
 	headers := map[string]string{
 		"Ocp-Apim-Subscription-Key": subscriptionKey,
 	}
