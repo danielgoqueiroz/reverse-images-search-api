@@ -1,10 +1,9 @@
 import requests
 
+# Defina suas credenciais da API do Google
 API_KEY = "AIzaSyDfr5L585HBytSi70XcA-8mjLLGaXMC_fE"
 SEARCH_ENGINE_ID = "e0abb43f7fc734352"
 
-
-# Defina suas credenciais da API do Google
 api_key = API_KEY
 cx = SEARCH_ENGINE_ID
 
