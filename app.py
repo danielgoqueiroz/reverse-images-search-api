@@ -11,8 +11,8 @@ app.config['JSON_SORT_KEYS'] = False
 load_dotenv()
 
 BING_KEY = os.getenv("BING_SUBSCRIPTION_KEY")
-GOOGLE_KEY = os.getenv("API_KEY")
-GOOGLE_ID = os.getenv("SEARCH_ENGINE_ID")
+GOOGLE_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_ID = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
 APP_KEY = os.getenv("KEY")
 
 
@@ -63,7 +63,13 @@ def google_search(image_url):
     startIndex = 1
     urls = []
 
-    response = requests.get(get_google_url(image_url, startIndex))
+    response = requests.get(
+        get_google_url(image_url, startIndex),
+        headers={
+            "Referer": "https://www.google.com/"
+        })
+    if response.status_code != 200:
+        return {"error": response.text}
     MAX_RESULTS = int(response.json()['searchInformation']['totalResults'])
 
     while startIndex < MAX_RESULTS:
@@ -86,24 +92,24 @@ def google_search(image_url):
     return urls
 
 
-@app.route("/api/health")
+@ app.route("/api/health")
 def health_check():
     return "OK"
 
 
-@app.route("/")
+@ app.route("/")
 def hello_world():
     return "ONLINE"
 
 
-@app.route("/api/bingsearch")
+@ app.route("/api/bingsearch")
 def bing_search_image():
     image_url = request.args.get("imageURL", "")
     key = request.headers.get("key", "")
     if not image_url:
         return jsonify({"error": "imageURL not provided"}), 400
     if not key or key != APP_KEY:
-        return jsonify({"error": "Invalid access key" + key}), 401
+        return jsonify({"error": "Invalid access key " + key}), 401
 
     results = bing_search(image_url, BING_KEY)
     if "error" in results:
@@ -112,7 +118,7 @@ def bing_search_image():
     return jsonify(results), 200
 
 
-@app.route("/api/googlesearch")
+@ app.route("/api/googlesearch")
 def google_search_image():
     image_url = request.args.get("imageURL", "")
     key = request.headers.get("key", "")
